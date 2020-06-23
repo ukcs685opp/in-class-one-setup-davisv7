@@ -17,3 +17,6 @@ doc/package-list
 .settings/org.eclipse.*
 /bin/
 doc/*
+
+# Intellij IDE files
+*.iml
