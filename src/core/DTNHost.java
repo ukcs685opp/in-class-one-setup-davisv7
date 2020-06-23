@@ -5,11 +5,13 @@
 package core;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
 import movement.MovementModel;
 import movement.Path;
+import routing.HyperCubeRouter;
 import routing.MessageRouter;
 import routing.util.RoutingInfo;
 
@@ -79,6 +81,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		this.movement.setHost(this);
 		setRouter(mRouterProto.replicate());
 
+
 		this.location = movement.getInitialLocation();
 
 		this.nextTimeToMove = movement.nextPathAvailable();
@@ -134,6 +137,11 @@ public class DTNHost implements Comparable<DTNHost> {
 	private void setRouter(MessageRouter router) {
 		router.init(this, msgListeners);
 		this.router = router;
+		if (this.router instanceof HyperCubeRouter){
+//			System.out.print("here");
+			((HyperCubeRouter) this.router).setName(this.name);
+			((HyperCubeRouter) this.router).initProfile();
+		}
 	}
 
 	/**
@@ -219,6 +227,11 @@ public class DTNHost implements Comparable<DTNHost> {
 	public void setName(String name) {
 		this.name = name;
 	}
+
+	public String getName() {
+		return this.name;
+	}
+
 
 	/**
 	 * Returns the messages in a collection.

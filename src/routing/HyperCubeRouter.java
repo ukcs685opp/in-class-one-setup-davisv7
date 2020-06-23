@@ -6,6 +6,10 @@ import core.Message;
 import core.Settings;
 import util.Tuple;
 
+//import java.io.BufferedReader;
+//import java.io.File;
+import java.io.*;
+import java.lang.reflect.Array;
 import java.util.*;
 
 
@@ -13,31 +17,57 @@ import java.util.*;
 public class HyperCubeRouter extends ActiveRouter {
 
 
-    /** Prophet router's setting namespace ({@value})*/
+    /** Hypercube router's setting namespace ({@value})*/
     public static final String HYPERCUBE_NS = "HyperCubeRouter";
 
-    /**
-     * Whether or not to generate random weights -setting id ({@value}).
-     * */
-    public static final String RANDOM_WEIGHTS ="randomWeights";
+//    /**
+//     * Whether or not to generate random weights -setting id ({@value}).
+//     * */
+//    public static final String RANDOM_WEIGHTS ="randomWeights";
 
     /**
      * Namespace for given weight array -setting id ({@value}).
      */
     public static final String WEIGHT_ARRAY= "weightArray";
+    /**
+     * Namespace for given threshold -setting id ({@value}).
+     */
+    public static final String THRESHOLD= "threshold";
 
-    /** common rng for generating random profiles in the simulation */
+    /**
+     * Namespace for the dimension of the hypercube -setting d ({@value}).
+     */
+    public static final String DIMENSION = "dimension";
+
+//    /** HyperCube Routers rng seed -setting id ({@value})*/
+//    public static final String RNG_SEED = "rngSeed";
+
+    private int dimension;
+
+    /**
+     * Namespace for the filename of the individual profiles -setting id ({@value}).
+     */
+    public static final String PROFILE_FILENAME ="profileFilename";
+
+    private String filename;
+
+
+    /** common rng for all movement models in the simulation */
     protected static Random rng;
 
-    /** are the weights generated at random? */
-    private final boolean isRandom;
+//    /** are the weights generated at random? */
+//    private final boolean isRandom;
 
     /** weight vector used in threshold function */
-    private double[] weightArray = {};
+    private ArrayList<Double> weightArray = new ArrayList<Double>();
+
+    private float threshold;
+
+    private String name;
 
 
     /** which corner in the hypercube does this host lie on? */
-    private Map<DTNHost, String> corner;
+    private String corner;
 
     /**
      * Constructor. Creates a new message router based on the settings in
@@ -47,15 +77,22 @@ public class HyperCubeRouter extends ActiveRouter {
     public HyperCubeRouter(Settings s) {
         super(s);
         Settings hypercubeSettings = new Settings(HYPERCUBE_NS);
-        isRandom = hypercubeSettings.getBoolean(RANDOM_WEIGHTS);
-        if (isRandom){
-            System.out.print("The random weight function needs to be defined");
-//            weightArray = randomweights()
-        } else {
-            weightArray = hypercubeSettings.getCsvDoubles(WEIGHT_ARRAY);
-            System.out.print(Arrays.toString(weightArray));
+//        this.isRandom = hypercubeSettings.getBoolean(RANDOM_WEIGHTS);
+        this.dimension = hypercubeSettings.getInt(DIMENSION);
+        this.filename = hypercubeSettings.getSetting(PROFILE_FILENAME);
+        this.threshold = (float) hypercubeSettings.getDouble(THRESHOLD);
+//        if (this.isRandom){
+//                int seed = hypercubeSettings.getInt(RNG_SEED);
+//                rng = new Random(seed);
+//            randomWeights();
+//        } else {
+            for(Double item:hypercubeSettings.getCsvDoubles(WEIGHT_ARRAY)){
+                this.weightArray.add(item);
+            }
+            System.out.print(Arrays.toString(weightArray.toArray()));
 
-        }
+//        }
+//        initProfile();
 
 //        DTNHost host = getHost();
 //        if (host != null){
@@ -66,10 +103,60 @@ public class HyperCubeRouter extends ActiveRouter {
         //TODO: add and define a function for init the weights
         //TODO: define a function for the threshold
     }
+    public void setName(String name){
+        this.name = name;
+    }
 
-//    private void initWeights(Settings s){
-//        s.getSetting();
+//    public void randomWeights(){
+//        for (int i=0;i<dimension;i++){
+//            this.weightArray.add(rng.nextInt(100)/100.0);
+//        }
+//        System.out.print(Arrays.toString(weightArray.toArray()));
 //    }
+
+    public void initProfile() {
+        File file = new File(this.filename);
+        String id;
+        String profile;
+        try (Scanner scanner = new Scanner(file)) {
+            while (scanner.hasNext()) {
+                id = scanner.next();
+                profile = scanner.next();
+//                System.out.println(id);
+//                System.out.println(profile);
+//                System.out.println(this.name);
+                if (id.equals(this.name)){
+                    this.corner = profile;
+                    System.out.println(this.name);
+                    System.out.println(this.corner);
+                    return;
+                }
+
+            }
+            scanner.close();
+        }
+        catch (FileNotFoundException e){
+            System.out.print("File not found");
+        }
+    }
+    public String getCorner(){
+        return this.corner;
+    }
+
+    public Integer getDistance(String corner,String othCorner){
+        int count = 0;
+        for (int i = 0; i<corner.length();i++){
+            if (corner.charAt(i)!=othCorner.charAt(i)){
+                count++;
+            }
+
+        }
+        return count;
+    }
+    public ArrayList<Double> getWeightArray(){
+        return weightArray;
+    }
+
 
     /**
      * Copyconstructor.
@@ -77,9 +164,29 @@ public class HyperCubeRouter extends ActiveRouter {
      */
     protected HyperCubeRouter(HyperCubeRouter r) {
         super(r);
-        this.isRandom = r.isRandom;
+        this.filename = r.filename;
+        this.weightArray = r.weightArray;
 
 
+    }
+
+    boolean thresholdFunction(HyperCubeRouter r,Message m){
+        double sTor = 1.0/getDistance(r.getCorner(),this.getCorner());
+        double rTod = 1.0/getDistance(r.getCorner(),((HyperCubeRouter) m.getTo().getRouter()).getCorner());
+        double ihop = 1.0/m.getHops().size();
+        double sum = 0;
+        double[] factors = {sTor,rTod,ihop};
+        ArrayList<Double> weights = getWeightArray();
+        for (int i =0;i<weights.size();i++){
+            sum += weights.get(i) *factors[i];
+        }
+//        return sigmoid(sum)>threshold;
+        return true;
+    }
+
+
+    public static double sigmoid(double x) {
+        return (1/( 1 + Math.pow(Math.E,(-1*x))));
     }
 
     @Override
@@ -122,12 +229,10 @@ public class HyperCubeRouter extends ActiveRouter {
                 if (othRouter.hasMessage(m.getId())) {
                     continue; // skip messages that the other one has
                 }
-                //TODO: Change this condition to use the threshold function
-//                if (othRouter.getPredFor(m.getTo()) > getPredFor(m.getTo())) {
-//                    // the other node has higher probability of delivery
-//                    messages.add(new Tuple<Message, Connection>(m,con));
-//                rng.d;
-//                }
+                else if (thresholdFunction(othRouter,m)){
+                    messages.add(new Tuple<Message, Connection>(m,con));
+                }
+
             }
         }
 
