@@ -70,7 +70,6 @@ public class HyperCubeRouter extends ActiveRouter {
     private String name;
 
 
-
     /**
      * which corner in the hypercube does this host lie on?
      */
@@ -152,23 +151,22 @@ public class HyperCubeRouter extends ActiveRouter {
         super(r);
         this.filename = r.filename;
         this.weightArray = r.weightArray;
+        this.threshold = r.threshold;
 
 
     }
 
     boolean thresholdFunction(HyperCubeRouter r, Message m) {
-        double sTor = 1.0 / getDistance(r.getCorner(), this.getCorner());
-        double rTod = 1.0 / getDistance(r.getCorner(), ((HyperCubeRouter) m.getTo().getRouter()).getCorner());
-        double ihop = 1.0 / m.getHops().size();
-        m.getHopCount();
+        double sTor = getDistance(r.getCorner(), this.getCorner())/(double) this.getCorner().length();
+        double rTod = getDistance(r.getCorner(), ((HyperCubeRouter) m.getTo().getRouter()).getCorner())/(double) this.getCorner().length();
+        double ihop = 1.0 - Math.min(m.getHopCount()/(double) this.getCorner().length(),1);
         double sum = 0;
         double[] factors = {sTor, rTod, ihop};
         ArrayList<Double> weights = getWeightArray();
         for (int i = 0; i < weights.size(); i++) {
             sum += weights.get(i) * factors[i];
         }
-//        System.out.println(sigmoid(sum));
-        return sigmoid(sum) > threshold;
+        return sum > threshold;
     }
 
 
@@ -216,10 +214,18 @@ public class HyperCubeRouter extends ActiveRouter {
             for (Message m : msgCollection) {
                 if (othRouter.hasMessage(m.getId())) {
                     continue; // skip messages that the other one has
-                } else if (thresholdFunction(othRouter, m)) {
-                    messages.add(new Tuple<Message, Connection>(m, con));
-
-                } 
+                } else {
+                    // if relay has a shorter social distance than the current host
+//                    double sTod = -getDistance(this.getCorner(), ((HyperCubeRouter) m.getTo().getRouter()).getCorner());
+//                    double rTod = -getDistance(othRouter.getCorner(), ((HyperCubeRouter) m.getTo().getRouter()).getCorner());
+//                    if (rTod <= sTod) {
+//                        if (m.getHopCount()<4) {
+                        if (thresholdFunction(othRouter, m)) {
+                            messages.add(new Tuple<Message, Connection>(m, con));
+                        }
+//                    }
+//                    }
+                }
 
             }
         }
